@@ -906,9 +906,24 @@ err_t wireguardif_init(struct netif *netif) {
 	struct udp_pcb *udp;
 	uint8_t private_key[WIREGUARD_PRIVATE_KEY_LEN];
 	size_t private_key_len = sizeof(private_key);
+   
+    struct netif* underlying_netif = NULL;
+
+	LWIP_ASSERT("netif != NULL", (netif != NULL));
+	LWIP_ASSERT("state != NULL", (netif->state != NULL));
+
+	/* init_data is passed through netif->state before real device state is attached */
+	init_data = (struct wireguardif_init_data *)netif->state;
+
+	/* Prefer injected bind_netif first (PPP/WiFi/etc.) */
+	if (init_data && init_data->bind_netif != NULL) {
+		underlying_netif = init_data->bind_netif;
+		ESP_LOGI(TAG, "Using injected bind_netif: %p", (void *)underlying_netif);
+	}
+
 
 #if defined(CONFIG_WIREGUARD_ESP_NETIF)
-	struct netif* underlying_netif = NULL;
+	if (underlying_netif == NULL) {
 	char lwip_netif_name[8] = {0,};
 
 	err = esp_netif_get_netif_impl_name(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"), lwip_netif_name);
@@ -923,19 +938,29 @@ err_t wireguardif_init(struct netif *netif) {
 		result = ERR_IF;
 		goto fail;
 	}
+	}
 #elif defined(CONFIG_WIREGUARD_ESP_TCPIP_ADAPTER)
-	void *underlying_netif = NULL;
+	if (underlying_netif == NULL) {
+	void *tmp_netif = NULL;
 	err = tcpip_adapter_get_netif(TCPIP_ADAPTER_IF_STA, &underlying_netif);
 	if (err != ESP_OK) {
 		ESP_LOGE(TAG, "tcpip_adapter_get_netif: %s", esp_err_to_name(err));
 		result = ERR_IF;
 		goto fail;
 	}
+		underlying_netif = (struct netif *)tmp_netif;
+}
 #endif
+
+	if (underlying_netif == NULL) {
+		ESP_LOGE(TAG, "underlying_netif is NULL");
+		result = ERR_IF;
+		goto fail;
+	}
 	ESP_LOGD(TAG, "underlying_netif = %p", underlying_netif);
 
-	LWIP_ASSERT("netif != NULL", (netif != NULL));
-	LWIP_ASSERT("state != NULL", (netif->state != NULL));
+	// LWIP_ASSERT("netif != NULL", (netif != NULL));
+	// LWIP_ASSERT("state != NULL", (netif->state != NULL));
 
 	// We need to initialise the wireguard module
 	wireguard_init();

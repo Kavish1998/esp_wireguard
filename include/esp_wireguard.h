@@ -127,6 +127,11 @@ esp_err_t esp_wireguard_set_default(wireguard_ctx_t *ctx);
 esp_err_t esp_wireguardif_peer_is_up(wireguard_ctx_t *ctx);
 
 /**
+ * @brief Test if the bind netif is set.
+ */
+void esp_wireguard_set_bind_netif(struct netif *netif);
+
+/**
  * @brief Disconnect from the peer
  *
  * @param ctx Context of WireGuard.

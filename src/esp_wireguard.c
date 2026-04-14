@@ -35,6 +35,7 @@
 #include <lwip/ip.h>
 #include <lwip/netdb.h>
 #include <lwip/err.h>
+#include <lwip/netif.h>
 #include <esp_err.h>
 #include <esp_log.h>
 #include <esp_wireguard.h>
@@ -54,9 +55,15 @@
 
 static struct netif wg_netif_struct = {0};
 static struct netif *wg_netif = NULL;
+static struct netif *s_bind_netif = NULL;
 static struct wireguardif_peer peer = {0};
 static uint8_t wireguard_peer_index = WIREGUARDIF_INVALID_INDEX;
 static uint8_t preshared_key_decoded[WG_KEY_LEN];
+
+void esp_wireguard_set_bind_netif(struct netif *netif)
+{
+    s_bind_netif = netif;
+}
 
 static esp_err_t esp_wireguard_peer_init(const wireguard_config_t *config, struct wireguardif_peer *peer)
 {
@@ -166,7 +173,8 @@ static esp_err_t esp_wireguard_netif_create(const wireguard_config_t *config)
     /* Setup the WireGuard device structure */
     wg.private_key = config->private_key;
     wg.listen_port = config->listen_port;
-    wg.bind_netif = NULL;
+    //wg.bind_netif = NULL;
+    wg.bind_netif = s_bind_netif;
 
     ESP_LOGI(TAG, "allowed_ip: %s", config->allowed_ip);
 
